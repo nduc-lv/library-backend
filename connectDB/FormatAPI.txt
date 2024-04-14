@@ -1,0 +1,51 @@
+// Book
+{
+	"ID_book": "",
+	"Name": "",
+	"Image": "",
+	"Genre": "",
+	"Author": "",
+	"Review": ""
+}
+// Customer
+{
+	"ID_customer": "",
+	"Name": "",
+	"Phone": "",
+	"Email": "",
+	"Age": "",
+	"Address": "",
+	"Reputation": ""
+}
+// Staff
+{
+	"Username": "",
+	"Password": ""
+}
+// Author
+{
+	"ID_author": "",
+	"Name": ""
+}
+// Genre
+{
+ 	"ID_genre": "",
+	"Name": ""
+}
+// Record
+{
+	"ID_record": "",
+	"ID_book": "",
+	"ID_customer": "",
+	"Number_of_books": "",
+	"TimeStart": "",
+	"TimeEnd": "",
+	"Status": ""
+}
+// Comment
+{
+	"ID_comment" : "",
+	"ID_book" : "",
+	"ID_customer" : "",
+	"Content" : ""
+}

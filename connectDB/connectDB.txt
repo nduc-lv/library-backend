@@ -1,0 +1,8 @@
+user: root
+pass: 123
+
+Link connect với Code:
+mongodb+srv://root:123@cluster0.g9jqpaf.mongodb.net/web_project?retryWrites=true&w=majority
+
+Link connect với Compass:
+mongodb+srv://root:123@cluster0.g9jqpaf.mongodb.net/
