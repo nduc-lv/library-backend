@@ -38,8 +38,12 @@
 	"ID_book": "",
 	"ID_customer": "",
 	"Number_of_books": "",
-	"TimeStart": "",
-	"TimeEnd": "",
+	"TimeStart": {
+    		"$date": ""
+  	},
+	"TimeEnd": {
+    		"$date": ""
+  	},
 	"Status": ""
 }
 // Comment
