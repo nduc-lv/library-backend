@@ -1,15 +1,14 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const Record = new Schema({
-    ID_record: String,
-    ID_book: String,
-    ID_customer: String,
-    Number_of_books: String,
-    TimeStart: Date,
-    TimeEnd: Date,
-    Status: String
+const RecordSchema = new Schema({
+    book: {type: Schema.Types.ObjectId, ref: "Book", require: true},
+    customer: {type: Schema.Types.ObjectId, ref: "Customer", require: true},
+    numberOfBooks: {type: Number, require: true},
+    timeStart: {type: Date, require: true},
+    timeEnd: {type: Date},
+    status: {type: String, require: true},
 })
 
 
-module.exports = mongoose.model('Record', Record);
+module.exports = mongoose.model('Record', RecordSchema);

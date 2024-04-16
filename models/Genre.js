@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const Genre = new Schema({
-    ID_genre: String,
-    Name: String
+const GenreSchema = new Schema({
+    name: {type: String, require: true}
 })
 
 
-module.exports = mongoose.model('Genre', Genre);
+module.exports = mongoose.model('Genre', GenreSchema);

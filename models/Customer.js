@@ -1,15 +1,17 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const Customer = new Schema({
-    ID_customer: String,
-    Name: String,
-    Phone: String,
-    Email: String,
-    Age: String,
-    Address: String,
-    Reputation: String
+const CustomerSchema = new Schema({
+    name: {type: String, require: true},
+    phone: {type: String},
+    email: {type: String, require: true},
+    password: {type: String, require: true},
+    dateOfBirth: {type: Date, require: true},
+    address: {type: String},
+    reputation: {type: Number, require: true},
+    refreshToken: {type: String},
+    accessToken: {type: String}
 })
 
 
-module.exports = mongoose.model('Customer', Customer);
+module.exports = mongoose.model('Customer', CustomerSchema);
