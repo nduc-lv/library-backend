@@ -10,7 +10,8 @@ const CustomerSchema = new Schema({
     address: {type: String},
     reputation: {type: Number, require: true},
     refreshToken: {type: String},
-    accessToken: {type: String}
+    accessToken: {type: String},
+    isVerified: {type: Boolean}
 })
 
 

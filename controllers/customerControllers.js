@@ -5,9 +5,10 @@ const Customer = require("../models/Customer")
 const Comment = require("../models/Comment");
 const Record = require("../models/Record");
 const asyncHandler = require("express-async-handler");
-const validator = require("express-validator");
-
-
+const bcrypt = require("bcrypt")
+const {validator, body, validationResult} = require("express-validator");
+const {sendingMail} = require("../util/mailling")
+const jwt = require("jsonwebtoken")
 // BOOK //
 // get books by genre
 exports.postBooksByGenres = asyncHandler(async (req, res, next) => {
@@ -282,4 +283,157 @@ exports.getAllComments = asyncHandler(async (req, res, next) => {
         comments
     })
 })
+
+// PROFILE
+
+// login
+exports.postSignUp  = [
+    body("name")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .isAlphanumeric()
+    .withMessage("Ten khong bao gom cac ky ty dac biet"),
+    body("email")
+    .trim()
+    .isEmail()
+    .escape()
+    .withMessage("Email is not valid"),
+    body("dateOfBirth", "Invalid date of birth")
+    .optional({values: "falsy"})
+    .isISO8601()
+    .toDate(),
+    body("address")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .withMessage("Dia chi ko hop le"),
+    body("phonenumber")
+    .trim()
+    .isLength({min: 9})
+    .escape()
+    .withMessage("so dien thoai khong hop le")
+    .isNumeric()
+    .withMessage("so dien thoai khong hop le"),
+    body("password")
+    .trim()
+    .isStrongPassword({
+        minLength: 8,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 1,
+        returnScore: false
+    })
+    .withMessage("Mat khau it nat 8 ky tu, bao gom it nhat 1 ky tu in hoa, 1 ky tu in thuong, 1 chu so va 1 ky tu dac biet"),
+    asyncHandler(async (req, res, next) => {
+        const error = validationResult(req);
+        const email = req.body.email
+        if (!error.isEmpty()){
+            return res.status(422).json({
+                error
+            })
+        }
+        // check if the email already existed?
+        const user = await Customer.findOne({email: email})
+        if (user){
+            return res.status(409).json({
+                message: "Tai khoan da ton tai"
+            })
+        }
+
+        // save the user, but set isVerified to false
+        const info = {
+            name: req.body.name,
+            email: req.body.email,
+            password: await bcrypt.hash(req.body.password, 10),
+            isVerified: false,
+            dateOfBirth: req.body.dateOfBirth,
+            address: req.body.address,
+            reputation: 99,
+            accessToken: null,
+            refreshToken: null,
+            phone: req.body.phone
+        }
+        const newCustomer = new Customer(info);
+        await newCustomer.save();
+        if (newCustomer) {
+            sendingMail({
+                from: "no-reply@gmail.com",
+                to: `${req.body.email}`,
+                subject: "Account Verification Link",
+                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau:
+                http://localhost:3000/api/customer/verify-email/${newCustomer._id}` 
+            })
+        }
+        return res.status(200).json({
+            message: "Success"
+        })
+    })
+
+]
+
+exports.verfiyEmail =  asyncHandler(async (req, res, next) => {
+    const userId = req.params.userid;
+    // find user
+    const customer = await Customer.findById(userId)
+    if (!customer){
+        return res.status(400).json({
+            message: "not valid"
+        })
+    }
+    else if (customer.isVerified){
+        return res.status(400).json({
+            message: "Already verified"
+        })
+    }
+    await Customer.updateOne({_id: userId}, {isVerified: true});
+})
+
+exports.postLogin = [
+    body("email")
+    .trim()
+    .isEmail()
+    .escape()
+    .withMessage("Email khong hop le"),
+    body("password")
+    .trim()
+    .isStrongPassword({
+        minLength: 8,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 1,
+        returnScore: false
+    })
+    .withMessage("Mat khau it nat 8 ky tu, bao gom it nhat 1 ky tu in hoa, 1 ky tu in thuong, 1 chu so va 1 ky tu dac biet"),
+    asyncHandler(async (req, res, next) => {
+        const {email, password} = req.body;
+        const customer = await Customer.findOne({email: email, isVerified: true});
+        if (!customer){
+            return res.status(404).json({
+                message: "Tai khoan khong ton tai"
+            })
+        }
+        const isSame = bcrypt.compare(password, customer.password);
+        if (isSame){
+            let accessToken = jwt.sign({id: customer._id}, process.env.key, {
+                expiresIn: "1d"
+            })
+            let refreshToken = jwt.sign({id: customer._id}, process.env.key, {
+                expiresIn: '30d'
+            })
+            await Customer.updateOne({_id: customer._id}, {accessToken, refreshToken})
+            // res.cookie("ACCESS_TOKEN", accessToken, {httpOnly: true, path:"/"});
+            // res.cookie("REFRESH_TOKEN", refreshToken, {httpOnly: true});
+            return res.status(200).json({
+                accessToken,
+                refreshToken
+            })
+        }
+        else {
+            return res.status(403).json({
+                message: "Sai mat khau"
+            })
+        }
+    })
+]
 

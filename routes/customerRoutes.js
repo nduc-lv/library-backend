@@ -11,4 +11,7 @@ router.get("/getComments/:bookId", customerControllers.getAllComments)
 router.get("/getBookDetails/:bookId", customerControllers.getBookDetails)
 router.post("/updateReservation", customerControllers.postUpdateReservation)
 router.post("/deleteReservation", customerControllers.postDeleteReservation)
+router.post("/signup", customerControllers.postSignUp);
+router.get("/verify-email/:userid", customerControllers.verfiyEmail);
+router.post("/login", customerControllers.postLogin)
 module.exports = router
