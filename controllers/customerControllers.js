@@ -9,16 +9,43 @@ const bcrypt = require("bcrypt")
 const {validator, body, validationResult} = require("express-validator");
 const {sendingMail} = require("../util/mailling")
 const jwt = require("jsonwebtoken")
+
+//  GENRES //
+exports.getAllGenres = asyncHandler(async (req, res, next) => {
+    const genres = await Genre.find();
+    return res.status(200).json({
+        genres
+    })
+})
 // BOOK //
 // get books by genre
+exports.getAllBooks = asyncHandler(async (req, res, next) => {
+    const {limit, page} = req.query;
+    const [books, count] = await Promise.all([
+        Book.find().skip((page - 1) * limit).populate("authors").populate("genres").limit(limit*1).exec(),
+        Book.countDocuments()
+    ])
+    return res.status(200).json({
+        books,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+    })
+})
 exports.postBooksByGenres = asyncHandler(async (req, res, next) => {
     // get a list of genres
     const genres = req.body.genres;
-    const books = await Book.find(
-        {genres: {$in: genres}}
-    ).populate("authors").populate("genres").exec();
-    res.status(200).json({
-        books
+    const {limit, page} = req.query;
+    
+    const [books, count] = await Promise.all([
+        Book.find(
+            {genres: {$in: genres}}
+        ).skip((page -1) * limit).populate("authors").populate("genres").limit(limit * 1).exec(),
+        Book.countDocuments({genres: {$in: genres}})
+    ])
+    return res.status(200).json({
+        books,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page,
     })
 })
 // get book details
@@ -43,18 +70,20 @@ exports.getSearch = asyncHandler(async (req, res, next) => {
     const authors = await Author.find(
         {name: {$regex: ".*" + q + ".*", $options: 'i'}}
     ).select({_id: 1}).exec();
-    const books = await Book.find({
-        $or: [
-            {name: {$regex: ".*" + q + ".*", $options: 'i'}},
-            {authors: {$in: authors}}
-        ]
-    }).skip((page -1) * limit).populate("authors").populate("genres").limit(limit * 1).exec();
-    const count = await Book.countDocuments({
-        $or: [
-            {name: {$regex: ".*" + q + ".*", $options: 'i'}},
-            {authors: {$in: authors}}
-        ]
-    })
+    const [books, count] = await Promise.all([
+        Book.find({
+            $or: [
+                {name: {$regex: ".*" + q + ".*", $options: 'i'}},
+                {authors: {$in: authors}}
+            ]
+        }).skip((page -1) * limit).populate("authors").populate("genres").limit(limit * 1).exec(),
+        Book.countDocuments({
+            $or: [
+                {name: {$regex: ".*" + q + ".*", $options: 'i'}},
+                {authors: {$in: authors}}
+            ]
+        })
+    ])
     return res.status(200).json({
         books,
         totalPages: Math.ceil(count / limit),
@@ -76,6 +105,22 @@ const addRecord = async (customerId, bookId, action, numberOfBooks) => {
         await newRecord.save();
     }
 }
+exports.getAllReseveration = asyncHandler(async (req, res, next) => {
+    const {limit, page} = req.query;
+    const customerId = req.params.customerid // will be replaced
+    const [reservation, count] = await Promise.all(
+        [
+            Record.find({customer: customerId})
+            .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).exec(),
+            Record.countDocuments({customer: customerId})
+        ]
+    )
+    return res.status(200).json({
+        reservation,
+        currentPage: page,
+        totalPages: count
+    })
+})
 exports.postReserveBooks = asyncHandler(async (req, res, next) => {
     // get the id of the book the user want to reserve
     const bookId = req.body.bookId;
@@ -275,12 +320,16 @@ exports.postDeleteComment = asyncHandler(async (req, res, next) => {
 })
 
 exports.getAllComments = asyncHandler(async (req, res, next) => {
+    const {limit, page} = req.query
     const bookId = req.params.bookId;
-    const comments = await Comment.find({
-        book: bookId
-    }).populate("customer").exec();
+    const [comments, count] = await Promise.all([
+        Comment.find({book: bookId}).skip((page - 1) * limit).populate("customer").limit(limit*1).exec(),
+        Comment.countDocuments({book: bookId})
+    ])
     return res.status(200).json({
-        comments
+        comments,
+        totalPages: count,
+        currentPage: page
     })
 })
 
@@ -352,7 +401,7 @@ exports.postSignUp  = [
             reputation: 99,
             accessToken: null,
             refreshToken: null,
-            phone: req.body.phone
+            phone: req.body.phonenumber
         }
         const newCustomer = new Customer(info);
         await newCustomer.save();
@@ -436,4 +485,139 @@ exports.postLogin = [
         }
     })
 ]
+
+exports.authen = (req, res, next) => {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
+    jwt.verify(token, process.env.key, (err, user) => {
+        console.log(err)
+        if (err) {
+            return res.status(403).json({
+                message: "ERR ACCESS TOKEN"
+            })
+        }
+        next()
+    })
+}
+
+exports.refreshToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    console.log(process.env.key)
+    if (token == null){
+        return res.status(401).json({
+            message: "ERR REFRESH TOKEN"
+        })
+    }
+    else{
+        jwt.verify(token, process.env.key, (err, user) => {
+            console.log(err);
+            console.log(user);
+            if (err) {
+                return res.status(401).json({
+                    message: "ERR REFERSH TOKEN"
+                })
+            }
+            const newToken = jwt.sign({id: user.id}, process.env.key, {
+                expiresIn: "1d"
+            })
+            return res.status(200).json({
+                accessToken: newToken
+            })
+        })
+    }
+}
+
+// update profile
+exports.postUpdateProfile = [
+    body("name")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .isAlphanumeric()
+    .withMessage("Ten khong bao gom cac ky ty dac biet"),
+    body("email")
+    .trim()
+    .isEmail()
+    .escape()
+    .withMessage("Email is not valid"),
+    body("dateOfBirth", "Invalid date of birth")
+    .optional({values: "falsy"})
+    .isISO8601()
+    .toDate(),
+    body("address")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .withMessage("Dia chi ko hop le"),
+    body("phonenumber")
+    .trim(),
+    body("name")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .isAlphanumeric()
+    .withMessage("Ten khong bao gom cac ky ty dac biet"),
+    body("dateOfBirth", "Invalid date of birth")
+    .optional({values: "falsy"})
+    .isISO8601()
+    .toDate(),
+    body("address")
+    .trim()
+    .isLength({min: 1})
+    .escape()
+    .withMessage("Dia chi ko hop le"),
+    body("phonenumber")
+    .trim()
+    .isLength({min: 9})
+    .escape()
+    .withMessage("so dien thoai khong hop le")
+    .isNumeric()
+    .withMessage("so dien thoai khong hop le")
+    .isLength({min: 9})
+    .escape()
+    .withMessage("so dien thoai khong hop le")
+    .isNumeric()
+    .withMessage("so dien thoai khong hop le"),
+    asyncHandler(async (req, res, next) => {
+        const error = validationResult(req);
+        if (!error.isEmpty()){
+            return res.status(422).json({
+                error
+            })
+        }
+        const id = req.body.customerId;
+        const user = await Customer.findById(id);
+        if (!user){
+            return res.status(404).json({
+                message: "User not found"
+            })
+        }
+        const newInfo = {
+            name: req.body.name,
+            email: req.body.email,
+            dateOfBirth: req.body.dateOfBirth,
+            address: req.body.address,
+            phone: req.body.phonenumber
+        }
+        await Customer.findByIdAndUpdate(id, newInfo);
+        return res.status(200).json({
+            message: "success"
+        })
+    })
+]
+// get profile
+exports.getCustomerProfile = asyncHandler(async (req, res, next) => {
+    const customerId = req.params.customerId;
+    const user = await Customer.findById(customerId);
+    if (!user) {
+        return res.status(404).json({
+            message: "Customer not found"
+        })
+    }
+    return res.status(200).json({
+        customer: user
+    })
+})
 

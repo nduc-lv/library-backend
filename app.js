@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const dotenv = require('dotenv').config()
 const db = require('./config/db/connect');
+const cors = require("cors")
 //connect DB
 db.connect();
 
@@ -13,7 +14,7 @@ const usersRouter = require('./routes/users');
 const customerRouter = require("./routes/customerRoutes");
 
 const app = express();
-
+app.use(cors());
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
