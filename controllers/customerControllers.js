@@ -95,36 +95,76 @@ exports.getSearch = asyncHandler(async (req, res, next) => {
 // reserve book -> need to set a timer
 const addRecord = async (customerId, bookId, action, numberOfBooks) => {
     // reserved
+    const date = new Date();
     if (action === 1) {
         const newRecord = new Record({
             book: bookId,
             customer: customerId,
             status: "Đặt cọc",
-            numberOfBooks: numberOfBooks
+            numberOfBooks: numberOfBooks,
+            timeStart: date.toISOString(),
+            timeEnd: date.setDate(date.getDate() + 7)
         })
         await newRecord.save();
     }
 }
 exports.getAllReseveration = asyncHandler(async (req, res, next) => {
-    const {limit, page} = req.query;
-    const customerId = req.params.customerid // will be replaced
-    const [reservation, count] = await Promise.all(
-        [
-            Record.find({customer: customerId})
-            .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).exec(),
-            Record.countDocuments({customer: customerId})
-        ]
-    )
-    return res.status(200).json({
-        reservation,
-        currentPage: page,
-        totalPages: count
-    })
+    const {type,limit, page} = req.query;
+    const customerId = res.locals.customerId // will be replaced
+    switch (type * 1) {
+        case 1:
+            {
+                const [reservation, count] = await Promise.all(
+                    [
+                        Record.find({customer: customerId})
+                        .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
+                        Record.countDocuments({customer: customerId})
+                    ]
+                )
+                return res.status(200).json({
+                    reservation,
+                    currentPage: page,
+                    totalPages: Math.ceil(count / limit),
+                })
+            }
+        case 2:
+            {
+                const [reservation, count] = await Promise.all(
+                    [
+                        Record.find({customer: customerId, status: "Đặt cọc"})
+                        .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
+                        Record.countDocuments({customer: customerId})
+                    ]
+                )
+                return res.status(200).json({
+                    reservation,
+                    currentPage: page,
+                    totalPages: Math.ceil(count / limit),
+                })
+            }
+        case 3:
+            {
+                const [reservation, count] = await Promise.all(
+                    [
+                        Record.find({customer: customerId, status: "Đã trả"})
+                        .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
+                        Record.countDocuments({customer: customerId})
+                    ]
+                )
+                return res.status(200).json({
+                    reservation,
+                    currentPage: page,
+                    totalPages: Math.ceil(count / limit),
+                })
+            }
+        default:
+            break;
+    }
 })
 exports.postReserveBooks = asyncHandler(async (req, res, next) => {
     // get the id of the book the user want to reserve
     const bookId = req.body.bookId;
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
     const numberOfBooks = req.body.numberOfBooks;
     // get the current quantity of the book
     const book = await Book.findById(bookId).select('quantity').exec();
@@ -163,7 +203,7 @@ exports.postReserveBooks = asyncHandler(async (req, res, next) => {
 // update reservation
 exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
     const bookId = req.body.bookId;
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
     const numberOfBooks = req.body.numberOfBooks;
     const recordId = req.body.recordId;
     // get the current quantity of the book
@@ -189,7 +229,7 @@ exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
         // update quantity
         await Promise.all(
             [Book.updateOne({_id: bookId}, {quantity: count + record.numberOfBooks - numberOfBooks * 1}),
-             Record.updateOne({_id: recordId}, {quantity: numberOfBooks})
+             Record.updateOne({_id: recordId}, {numberOfBooks: numberOfBooks})
             ]   
         );
         /* notify the staff using socket
@@ -201,7 +241,7 @@ exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
         });   
     }
     else{
-        res.status(200).json({
+        res.status(400).json({
             status: -1,
             message: "Out of books"
         })
@@ -210,7 +250,7 @@ exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
 
 exports.postDeleteReservation = asyncHandler(async (req, res, next) => {
     const bookId = req.body.bookId;
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
     const recordId = req.body.recordId;
     // get the current quantity of the book
     const [book, record] = await Promise.all([
@@ -237,18 +277,17 @@ exports.postDeleteReservation = asyncHandler(async (req, res, next) => {
         ]   
     );
     return res.status(200).json({
-        status: -1,
-        message: "Out of books"
+        status: 1,
+        message: "Success"
     })
 })
 
 // COMMENT
 exports.postAddComment = asyncHandler(async (req, res, next) => {
     // get params
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
     const bookId = req.body.bookId;
     const content = req.body.content;
-
     const date = new Date;
     const now = date.toISOString();
     // add comment
@@ -270,7 +309,7 @@ exports.postAddComment = asyncHandler(async (req, res, next) => {
 
 exports.postChangeComment = asyncHandler(async (req, res, next) => {
     const commentId = req.body.commentId;
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
     const newContent = req.body.content;
     // find this comment
     const comment = await Comment.findById(commentId).exec();
@@ -297,7 +336,7 @@ exports.postChangeComment = asyncHandler(async (req, res, next) => {
 
 exports.postDeleteComment = asyncHandler(async (req, res, next) => {
     const commentId = req.body.commentId;
-    const customerId = req.body.customerId;
+    const customerId = res.locals.customerId;
    
     // find this comment
     const comment = await Comment.findById(commentId).exec();
@@ -323,12 +362,12 @@ exports.getAllComments = asyncHandler(async (req, res, next) => {
     const {limit, page} = req.query
     const bookId = req.params.bookId;
     const [comments, count] = await Promise.all([
-        Comment.find({book: bookId}).skip((page - 1) * limit).populate("customer").limit(limit*1).exec(),
+        Comment.find({book: bookId}).skip((page - 1) * limit).populate("customer").limit(limit*1).sort({timeStamp: 'desc'}).exec(),
         Comment.countDocuments({book: bookId})
     ])
     return res.status(200).json({
         comments,
-        totalPages: count,
+        totalPages:  Math.ceil(count / limit),
         currentPage: page
     })
 })
@@ -341,7 +380,7 @@ exports.postSignUp  = [
     .trim()
     .isLength({min: 1})
     .escape()
-    .isAlphanumeric()
+    .isAlphanumeric('vi-VN', {ignore: ' '})
     .withMessage("Ten khong bao gom cac ky ty dac biet"),
     body("email")
     .trim()
@@ -410,8 +449,7 @@ exports.postSignUp  = [
                 from: "no-reply@gmail.com",
                 to: `${req.body.email}`,
                 subject: "Account Verification Link",
-                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau:
-                http://localhost:3000/api/customer/verify-email/${newCustomer._id}` 
+                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau: http://localhost:3001/api/customer/verify-email/${newCustomer._id}` 
             })
         }
         return res.status(200).json({
@@ -462,7 +500,7 @@ exports.postLogin = [
                 message: "Tai khoan khong ton tai"
             })
         }
-        const isSame = bcrypt.compare(password, customer.password);
+        const isSame = await bcrypt.compare(password, customer.password);
         if (isSame){
             let accessToken = jwt.sign({id: customer._id}, process.env.key, {
                 expiresIn: "1d"
@@ -491,16 +529,28 @@ exports.authen = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) return res.sendStatus(401);
     jwt.verify(token, process.env.key, (err, user) => {
-        console.log(err)
+        console.log(user);
         if (err) {
-            return res.status(403).json({
+            return res.status(401).json({
                 message: "ERR ACCESS TOKEN"
             })
         }
+        res.locals.customerId = user.id;
         next()
     })
 }
-
+exports.getCustomerId = (req, res, next) => {
+    // const customerId = req.locals.customerId;
+    const customerId = res.locals.customerId;
+    if (customerId){
+        return res.status(200).json({
+            customerId
+        })
+    }
+    return res.status(404).json({
+        message: "id not exist"
+    })
+}
 exports.refreshToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -535,13 +585,8 @@ exports.postUpdateProfile = [
     .trim()
     .isLength({min: 1})
     .escape()
-    .isAlphanumeric()
+    .isAlphanumeric('vi-VN', {ignore: ' '})
     .withMessage("Ten khong bao gom cac ky ty dac biet"),
-    body("email")
-    .trim()
-    .isEmail()
-    .escape()
-    .withMessage("Email is not valid"),
     body("dateOfBirth", "Invalid date of birth")
     .optional({values: "falsy"})
     .isISO8601()
@@ -557,7 +602,7 @@ exports.postUpdateProfile = [
     .trim()
     .isLength({min: 1})
     .escape()
-    .isAlphanumeric()
+    .isAlphanumeric('vi-VN', {ignore: ' '})
     .withMessage("Ten khong bao gom cac ky ty dac biet"),
     body("dateOfBirth", "Invalid date of birth")
     .optional({values: "falsy"})
@@ -587,7 +632,7 @@ exports.postUpdateProfile = [
                 error
             })
         }
-        const id = req.body.customerId;
+        const id = res.locals.customerId;
         const user = await Customer.findById(id);
         if (!user){
             return res.status(404).json({
@@ -596,7 +641,6 @@ exports.postUpdateProfile = [
         }
         const newInfo = {
             name: req.body.name,
-            email: req.body.email,
             dateOfBirth: req.body.dateOfBirth,
             address: req.body.address,
             phone: req.body.phonenumber
@@ -609,7 +653,8 @@ exports.postUpdateProfile = [
 ]
 // get profile
 exports.getCustomerProfile = asyncHandler(async (req, res, next) => {
-    const customerId = req.params.customerId;
+    const customerId = res.locals.customerId;
+    console.log(customerId);
     const user = await Customer.findById(customerId);
     if (!user) {
         return res.status(404).json({
@@ -621,3 +666,16 @@ exports.getCustomerProfile = asyncHandler(async (req, res, next) => {
     })
 })
 
+// get genre
+exports.getGenre =  asyncHandler(async (req, res, next) => {
+    const genreId = req.params.genreId;
+    const genre = await Genre.findById(genreId).exec();
+    if (!genre) {
+        return res.status(404).json({
+            message: "The loai khong hop le"
+        })
+    }
+    return res.status(200).json({
+        genre
+    })
+})
