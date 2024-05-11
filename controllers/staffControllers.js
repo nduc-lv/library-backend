@@ -44,7 +44,6 @@ exports.postAddBook = asyncHandler(async (req, res, next) => {
     if(book){
         return res.status(400).json({
             message: "Book Existed",
-            book
         })
     
     }
@@ -102,12 +101,9 @@ exports.postDeleteBook = asyncHandler(async (req, res, next) => {
             message: "book not found"
         })
     }
-
-    await Book.deleteOne({ _id: bookId })
-
+    delBook(bookId);
     return res.status(200).json({
-    
-        message: "Success"
+        message: "Delete Book Success"
     })
 })
 
@@ -205,7 +201,7 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
     const [customer, book, record] = await Promise.all([
         Customer.findById(customerId).exec(),
         Book.findById(bookId).select('quantity').exec(),
-        Record.findOne({ _id: recordId, customer: customerId }).populate("book").exec()
+        Record.findById(recordId).exec()
     ])
     if (!customer) {
         return res.status(404).json({
@@ -217,29 +213,31 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
             message: "Book not found"
         })
     }
-    if (!record) {
-        return res.status(404).json({
-            message: "Record not found"
-        })
-    }
-
-    const oldbook = await Book.find({ _id: record.book }).exec();
-
-    await Book.updateOne({ _id: oldbook._id }, { quantity: oldbook.quatity + record.numberOfBooks })
-
+  
+    const oldbook = await Book.findById(record.book).select('quantity').exec() ;
+   
+    await Book.updateOne({ _id: oldbook._id }, { quantity: oldbook.quantity + record.numberOfBooks })
+    //return res.status(200).json({
+        
+    //})
     let count = book.quantity;
 
-    if ((count - NumberOfBooks * 1) > 0) {
+    if ((count - NumberOfBooks ) > 0) {
 
         await Promise.all(
             [
-                Book.updateOne({ _id: bookId }, { quantity: count - NumberOfBooks * 1 }),
-                Record.updateOne({ _id: recordId }, { book: bookId }, { customer: customerId }, { numberOfBooks: NumberOfBooks }, { status: Status })
+                Book.updateOne({ _id: bookId }, { $set:{quantity: count - NumberOfBooks } }),
+                Record.updateOne({ _id: recordId }, { $set: {
+                                                            book: bookId , 
+                                                            customer: customerId , 
+                                                            numberOfBooks: NumberOfBooks , 
+                                                            status: Status 
+                                                        }
+                                                    })
             ]
         );
         return res.status(200).json({
-    
-            message: "Update successfully"
+            message: "Update successfully",
         });
     }
     else {
@@ -261,10 +259,13 @@ exports.postDeleteRecord = asyncHandler(async (req, res, next) => {
             message: "Record not found"
         })
     }
-
+ 
+    // trả lại sách
+    const book = await Book.findById(record.book).select('quantity').exec() ;
+    await Book.updateOne({ _id: book._id }, { quantity: book.quantity + record.numberOfBooks })
+    // xóa bản ghi
     await Record.deleteOne({ _id: recordId })
     return res.status(200).json({
-    
         message: "Delete record successful"
     })
 })
@@ -330,16 +331,21 @@ exports.postUpdateGenre = asyncHandler(async (req, res, next) =>{
 
 //[post] deleteGenre
 exports.postDeleteGenre = asyncHandler(async (req, res, next) => {
-
+    if(req.body.name == "Chưa có thể loại"){
+        return res.status(400).json({
+            message: "This Genre can't be deleted"})
+    }
     const genre = await Genre.findOne({name:req.body.name}).exec();
-     
+    
     if(!genre){
            return res.status(404).json({
              message: "Genre not found"
     }) 
     }
-    await Genre.deleteOne({ name:req.body.name })
+    delGenre(genre._id);
+   
     return res.status(200).json({
+
         message: "Delete genre success"
     })
  
@@ -414,9 +420,45 @@ exports.postDeleteAuthor = asyncHandler(async (req, res, next) => {
              message: "Author not found"
     }) 
     }
-    await Author.deleteOne({ name:req.body.name })
+    delAuthor(author._id)
     return res.status(200).json({
         message: "Delete Author success"
     })
  
  })
+
+// -------- FUNCTION ------- //
+
+// delBook
+const delBook = async (bookId) =>{
+    await Comment.deleteMany({book: bookId})
+    await Record.deleteMany({book: bookId})
+    await Book.deleteOne({_id: bookId})
+}
+
+//delAuthor
+const delAuthor = async (authorId) =>{
+    const books = Book.find({authors:{$in: authorId}}).exec();
+    (await books).map(book =>{
+        delBook(book._id)
+    });
+    await Author.deleteOne({ _id:authorId })
+}
+
+//delGenre
+const delGenre = async (genreId) => {
+
+    const books =await Book.find({genres: {$in: genreId}}).select('genres').exec()
+    books.map(async book =>{
+        const oldGenre = book.genres
+        const newGenre = oldGenre.filter( gen => !gen.equals(genreId ) );
+        if(newGenre.length == 0) newGenre.push("663e4e3dde29fd6a43f8d6af");
+        await Book.updateOne({_id: book._id},{
+            $set:{
+                genres: newGenre
+            }
+        })
+        }
+    )
+    await Genre.deleteOne({ _id:genreId })
+}

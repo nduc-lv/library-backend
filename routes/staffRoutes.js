@@ -26,7 +26,7 @@ router.get("/listcustomer", staffControllers.getAllCustomer)
 router.get("/listcustomer/:customerId", staffControllers.getCustomerDetail)
 router.get("/listrecord/:customerId",staffControllers.getCustomerRecord)
 router.post("/addrecord",staffControllers.postAddRerord)
-
+router.post("/updaterecord/:recordId",staffControllers.postUpdateRecord)
 router.post("/deleterecord",staffControllers.postDeleteRecord)
 
 //genre
@@ -40,4 +40,5 @@ router.get("/listauthor", staffControllers.getAllAuthors)
 router.post("/addauthor", staffControllers.postAddAuthor)
 router.post("/updateauthor/:authorId",staffControllers.postUpdateAuthor)
 router.post("/deleteauthor", staffControllers.postDeleteAuthor)
+
 module.exports = router
