@@ -4,9 +4,35 @@ const Author = require("../models/Author");
 const Customer = require("../models/Customer")
 const Comment = require("../models/Comment");
 const Record = require("../models/Record");
+const Staff = require("../models/Staff");
 
 const asyncHandler = require("express-async-handler");
 const { validator, body, validationResult } = require("express-validator");
+
+// -------STAFFS------- //
+
+//[post] login
+exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
+    const Username = req.body.username;
+    const Password = req.body.password;
+    const account = await Staff.findOne({username: Username}).exec();
+    
+    const acc = await Staff.find().exec();
+    if(!account){
+        return res.status(404).json({
+            message: "Tai khoan khong ton tai"
+        })
+    }
+    if(Password != account.password){
+        return res.status(400).json({
+            message: "Mat khau khong dung"
+        })
+    }
+    return res.status(200).json({
+        
+        message: "Dang nhap thanh cong"
+    })
+})
 
 // -------BOOK------- //
 
@@ -38,7 +64,7 @@ exports.getBookDetails = asyncHandler(async (req, res, next) => {
     })
 })
 
-//[post] add book
+//[post] addBook
 exports.postAddBook = asyncHandler(async (req, res, next) => {
     const book = await Book.findOne({$and:[{name: req.body.name} ,{authors: req.body.authors}]}).exec();
     if(book){
