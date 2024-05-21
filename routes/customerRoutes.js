@@ -23,4 +23,6 @@ router.get("/getCustomerProfile", customerControllers.authen, customerController
 router.post("/updateProfile", customerControllers.authen, customerControllers.postUpdateProfile)
 router.get("/getGenre/:genreId", customerControllers.getGenre);
 router.get("/getCustomerId", customerControllers.authen, customerControllers.getCustomerId);
+router.post("/resetPassword", customerControllers.resetPassword)
+router.post("/setNewPassword", customerControllers.setNewPassword)
 module.exports = router

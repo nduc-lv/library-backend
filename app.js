@@ -6,8 +6,9 @@ const logger = require('morgan');
 const dotenv = require('dotenv').config()
 const db = require('./config/db/connect');
 const cors = require("cors")
+const schedule = require("./schedule-task/schedule")
 //connect DB
-db.connect();
+db.connect().then(() => {schedule.schedulTask(); console.log("Scheulded Task")}).catch(e => {console.log(e)});
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
@@ -44,5 +45,6 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.json(err.message);
 });
+
 
 module.exports = app;

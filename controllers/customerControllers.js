@@ -157,6 +157,22 @@ exports.getAllReseveration = asyncHandler(async (req, res, next) => {
                     totalPages: Math.ceil(count / limit),
                 })
             }
+        case 4:
+            case 3:
+            {
+                const [reservation, count] = await Promise.all(
+                    [
+                        Record.find({customer: customerId, status: "Đang mượn"})
+                        .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
+                        Record.countDocuments({customer: customerId})
+                    ]
+                )
+                return res.status(200).json({
+                    reservation,
+                    currentPage: page,
+                    totalPages: Math.ceil(count / limit),
+                })
+            }
         default:
             break;
     }
@@ -167,37 +183,61 @@ exports.postReserveBooks = asyncHandler(async (req, res, next) => {
     const customerId = res.locals.customerId;
     const numberOfBooks = req.body.numberOfBooks;
     // get the current quantity of the book
-    const book = await Book.findById(bookId).select('quantity').exec();
-    let count;
-    if (book){
-        count = book.quantity
-    }
-    else{
-        return res.status(404).json({
-            message: "Book not found"
+    // const book = await Book.findById(bookId).select('quantity').exec();
+    // let count;
+    // if (book){
+    //     count = book.quantity
+    // }
+    // else{
+    //     return res.status(404).json({
+    //         message: "Book not found"
+    //     })
+    // }
+    const customer = await Customer.findById(customerId).exec();
+    if (customer.reputation <= 10) {
+        return res.status(403).json({
+            message: "Khong duoc phep"
         })
     }
-    if ((count - numberOfBooks * 1) > 0){
-        // update quantity
-        await Promise.all(
-            [Book.updateOne({_id: bookId}, {quantity: count - numberOfBooks * 1}),
-             addRecord(customerId, bookId, 1,numberOfBooks)
-            ]   
-        );
-        /* notify the staff using socket
+    const book = await Book.findOneAndUpdate({_id: bookId, quantity: { $gt: numberOfBooks * 1}}, { $inc: { quantity: - numberOfBooks * 1} })
+    if (!book) {
+        const requestedBook = await Book.findById(bookId);
+        if (!requestedBook) {
+            return res.status(404).json({
+                message: "Book not found"
+            });
+        }
+        else{
+            return res.status(406).json({
+                message: "Het sach"
+            })
+        }
+    }
+    await addRecord(customerId, bookId, 1,numberOfBooks)
+    return res.status(200).json({
+        message: "Success"
+    })
+    // if ((count - numberOfBooks * 1) > 0){
+    //     // update quantity
+    //     await Promise.all(
+    //         [Book.updateOne({_id: bookId}, {quantity: count - numberOfBooks * 1}),
+    //          addRecord(customerId, bookId, 1,numberOfBooks)
+    //         ]   
+    //     );
+    //     /* notify the staff using socket
 
-        */
-        return res.status(200).json({
-            status: 1,
-            message: "Reserved successfully"
-        });   
-    }
-    else{
-        res.status(200).json({
-            status: -1,
-            message: "Out of books"
-        })
-    }
+    //     */
+    //     return res.status(200).json({
+    //         status: 1,
+    //         message: "Reserved successfully"
+    //     });   
+    // }
+    // else{
+    //     res.status(200).json({
+    //         status: -1,
+    //         message: "Out of books"
+    //     })
+    // }
 })
 
 // update reservation
@@ -207,45 +247,68 @@ exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
     const numberOfBooks = req.body.numberOfBooks;
     const recordId = req.body.recordId;
     // get the current quantity of the book
-    const [book, record] = await Promise.all([
-        Book.findById(bookId).select('quantity').exec(),
-        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt cọc*.", $options: 'i'}}).populate("book").exec() 
-    ]) 
-    let count;
-    if (book){
-        count = book.quantity
-    }
-    else{
-        return res.status(404).json({
-            message: "Book not found"
+    const customer = await Customer.findById(customerId).exec();
+    if (customer.reputation <= 10) {
+        return res.status(403).json({
+            message: "Khong duoc phep"
         })
     }
+    const [record] = await Promise.all([
+        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt cọc*.", $options: 'i'}}).populate("book").exec() 
+    ]) 
+    // let count;
+    // if (book){
+    //     count = book.quantity
+    // }
+    // else{
+    //     return res.status(404).json({
+    //         message: "Book not found"
+    //     })
+    // }
     if (!record){
         return res.status(404).json({
             message: "Record not found"
         })
     }
-    if ((count + record.numberOfBooks - numberOfBooks * 1) > 0){
-        // update quantity
-        await Promise.all(
-            [Book.updateOne({_id: bookId}, {quantity: count + record.numberOfBooks - numberOfBooks * 1}),
-             Record.updateOne({_id: recordId}, {numberOfBooks: numberOfBooks})
-            ]   
-        );
-        /* notify the staff using socket
+    const book = await Book.findOneAndUpdate({_id: bookId, quantity: { $gt: numberOfBooks * 1 - record.numberOfBooks }}, { $inc: { quantity: record.numberOfBooks - numberOfBooks * 1} })
+    if (!book) {
+        const requestedBook = await Book.findById(bookId);
+        if (!requestedBook) {
+            return res.status(404).json({
+                message: "Book not found"
+            });
+        }
+        else{
+            return res.status(406).json({
+                message: "Het sach"
+            })
+        }
+    }
+    await Record.updateOne({_id: recordId}, {numberOfBooks: numberOfBooks})
+    return res.status(200).json({
+        message: "Success"
+    })
+    // if ((count + record.numberOfBooks - numberOfBooks * 1) > 0){
+    //     // update quantity
+    //     await Promise.all(
+    //         [Book.updateOne({_id: bookId}, {quantity: count + record.numberOfBooks - numberOfBooks * 1}),
+    //          Record.updateOne({_id: recordId}, {numberOfBooks: numberOfBooks})
+    //         ]   
+    //     );
+    //     /* notify the staff using socket
 
-        */
-        return res.status(200).json({
-            status: 1,
-            message: "Reserved successfully"
-        });   
-    }
-    else{
-        res.status(400).json({
-            status: -1,
-            message: "Out of books"
-        })
-    }
+    //     */
+    //     return res.status(200).json({
+    //         status: 1,
+    //         message: "Reserved successfully"
+    //     });   
+    // }
+    // else{
+    //     res.status(400).json({
+    //         status: -1,
+    //         message: "Out of books"
+    //     })
+    // }
 })
 
 exports.postDeleteReservation = asyncHandler(async (req, res, next) => {
@@ -473,7 +536,10 @@ exports.verfiyEmail =  asyncHandler(async (req, res, next) => {
             message: "Already verified"
         })
     }
-    await Customer.updateOne({_id: userId}, {isVerified: true});
+    else {
+        await Customer.updateOne({_id: userId}, {isVerified: true});
+        return res.redirect("http://localhost:8080/login")
+    }
 })
 
 exports.postLogin = [
@@ -500,7 +566,8 @@ exports.postLogin = [
                 message: "Tai khoan khong ton tai"
             })
         }
-        const isSame = await bcrypt.compare(password, customer.password);
+        const isSame = bcrypt.compare(password, customer.password);
+        console.log(isSame)
         if (isSame){
             let accessToken = jwt.sign({id: customer._id}, process.env.key, {
                 expiresIn: "1d"
@@ -527,9 +594,10 @@ exports.postLogin = [
 exports.authen = (req, res, next) => {
     const authHeader = req.headers['authorization']
     const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
+    console.log(token)
+    if (token == 'null') return res.sendStatus(400);
     jwt.verify(token, process.env.key, (err, user) => {
-        console.log(user);
+        // console.log(user);
         if (err) {
             return res.status(401).json({
                 message: "ERR ACCESS TOKEN"
@@ -556,7 +624,7 @@ exports.refreshToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
     console.log(process.env.key)
     if (token == null){
-        return res.status(401).json({
+        return res.status(403).json({
             message: "ERR REFRESH TOKEN"
         })
     }
@@ -565,7 +633,7 @@ exports.refreshToken = (req, res, next) => {
             console.log(err);
             console.log(user);
             if (err) {
-                return res.status(401).json({
+                return res.status(403).json({
                     message: "ERR REFERSH TOKEN"
                 })
             }
@@ -678,4 +746,51 @@ exports.getGenre =  asyncHandler(async (req, res, next) => {
     return res.status(200).json({
         genre
     })
+})
+
+// reset password
+
+exports.resetPassword = asyncHandler(async (req, res, next) => {
+    const email = req.body.email;
+    const customer = await Customer.findOne({
+        email: email
+    });
+    if (!customer) {
+        return res.status(404).json({
+            message: "Khong tim thay tai khoan"
+        })
+    }
+    const token = jwt.sign({email}, process.env.key, {expiresIn: "15m"});
+    try {
+        await sendingMail({
+            from: "no-reply@gmail.com",
+            to: `${req.body.email}`,
+            subject: "Reset Password",
+            text: `Xin chao. Truy cập đường link sau để cài lại mật khẩu của bạn  http://localhost:8080/forgotPassword/${token}` 
+        })
+        res.status(200).json({
+            message: "Success"
+        })
+    }
+    catch (e) {
+        console.log('Không gửi được email')
+    }
+
+})
+
+exports.setNewPassword = asyncHandler(async (req, res, next) => {
+    const newPassword = req.body.password;
+    const email = req.body.email;
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    try {
+        await Customer.findOneAndUpdate({email: email}, {password: hashedPassword})
+        return res.status(200).json({
+            message: "success"
+        })
+    }
+    catch (e) {
+        return res.status(400).json({
+            message: "Loi"
+        })
+    }
 })
