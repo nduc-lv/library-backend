@@ -14,6 +14,9 @@ const storage = multer.diskStorage({
   }
 })
 const upload = multer({ storage })
+//staff
+router.post("/login",staffControllers.postStaffLogin)
+
 //book
 router.get("/listbook", staffControllers.getAllBooks)
 router.get("/listbook/:bookId", staffControllers.getBookDetails)
