@@ -163,7 +163,7 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
             message: "Book not found",
         }) 
     }
-
+    //kiem tra so luong sach con lai
     const quantity= book.quantity;
  
     if(quantity < req.body.numberOfBooks * 1){
@@ -173,6 +173,13 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
     }
    
     await Book.updateOne({_id: req.body.bookId} , {quantity: quantity - req.body.numberOfBooks * 1});
+    const customer = await Customer.findById(req.body.customerId).exec();
+    if(customer.reputation <= 10){
+        return res.status(400).json({
+            message: "Customer not enough reputation"
+        })
+    }
+    await Customer.updateOne({_id: req.body.customerId} , {reputation: customer.reputation*1 - 10});
 
     const date = new Date();
     const newRecord = new Record({
@@ -190,9 +197,8 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
 })
 
 //[post] updateCustomerRecord
-exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
+exports.postUpdateRecord = asyncHandler(async (req, res, next) => { //thay doi noi dung cua ban ghi muon sach cua khach hang
     const recordId = req.params.recordId;
-
     const bookId = req.body.bookId;
     const customerId = req.body.customerId;
     const NumberOfBooks = req.body.numberOfBooks;
@@ -203,6 +209,11 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
         Book.findById(bookId).select('quantity').exec(),
         Record.findById(recordId).exec()
     ])
+    if(record.status == "Đã trả"){
+        return res.status(400).json({
+            message: "Record returned, Can not Fix"
+        })
+    }
     if (!customer) {
         return res.status(404).json({
             message: "Customer not found"
@@ -217,11 +228,7 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
     const oldbook = await Book.findById(record.book).select('quantity').exec() ;
    
     await Book.updateOne({ _id: oldbook._id }, { quantity: oldbook.quantity + record.numberOfBooks })
-    //return res.status(200).json({
-        
-    //})
     let count = book.quantity;
-
     if ((count - NumberOfBooks ) > 0) {
 
         await Promise.all(
@@ -246,8 +253,72 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
             message: "Out of books"
         })
     }
+
+
 })
 
+//[post] returnBook
+exports.postReturnBook = asyncHandler( async ( req, res, next ) =>{
+    const recordId = req.body.recordId;  
+   
+    const record = await Record.findById(recordId).exec();  
+ 
+    if(!record) {
+        return res.status(404).json({
+            message : "Record not found"
+        })
+    }
+    const book = await Book.findOne({_id: record.book}).exec();
+    const customer = await Customer.findOne({_id: record.customer}).exec();
+
+   
+
+    await Customer.updateOne({_id: customer._id },{ $set:{reputation: customer.reputation + 10} } ),
+    await Book.updateOne({ _id: book._id }, { $set:{quantity: book.quantity + record.numberOfBooks } }),
+    await Record.updateOne({ _id: recordId }, { $set: { status: "Đã trả"} })
+        
+    return res.status(200).json({
+        message: "Return book success"
+    })
+})
+
+//[post] checkAllRecord
+exports.postCheckAllRecord = asyncHandler(async( req, res, next)=>{
+    const records = await Record.find().exec();
+    
+    (await records).map(async record => {
+        const date = new Date();
+        const redate = record.timeEnd; 
+     
+        if( redate.getTime() < date.getTime() ){
+          
+            if(record.status == "Đang mượn" ||  record.status == "Quá hạn"){
+                await Record.updateOne({_id: record._id},{$set: {
+                                                        status: "Quá hạn",
+                                                        timeEnd: date.setDate(redate.getDate()+7)
+                }})        
+                const customer=await Customer.findById(record.customer).exec();
+                await Customer.updateOne({_id: customer._id},{$set: {
+                                                        reputation : customer.reputation - 10 
+                }})   
+            }
+        
+            if(record.status == "Đặt cọc"){
+                const book = await Book.findById(record.book).exec();
+                await Book.updateOne({_id: book._id},{$set: {
+                                                        quantity: book.quantity + record.numberOfBooks
+                }})  
+                await Record.deleteOne({_id: record._id});
+            } 
+        }
+       
+    }
+    )
+
+    return res.status(200).json({
+        message : "Check all record success"
+    })
+})
 
 //[post] deleteRecord
 exports.postDeleteRecord = asyncHandler(async (req, res, next) => {

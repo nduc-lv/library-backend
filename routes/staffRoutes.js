@@ -27,6 +27,9 @@ router.get("/listcustomer/:customerId", staffControllers.getCustomerDetail)
 router.get("/listrecord/:customerId",staffControllers.getCustomerRecord)
 router.post("/addrecord",staffControllers.postAddRerord)
 router.post("/updaterecord/:recordId",staffControllers.postUpdateRecord)
+router.post("/returnBook",staffControllers.postReturnBook)
+router.post("/listrecord/checkrecord",staffControllers.postCheckAllRecord)
+
 router.post("/deleterecord",staffControllers.postDeleteRecord)
 
 //genre
