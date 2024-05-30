@@ -20,31 +20,31 @@ router.post("/login",staffControllers.postStaffLogin)
 //book
 router.get("/listbook", staffControllers.getAllBooks)
 router.get("/listbook/:bookId", staffControllers.getBookDetails)
-router.post("/addbook",upload.single('bookcover'), staffControllers.postAddBook)
-router.post("/updatebook/:bookId",upload.single('bookcover') , staffControllers.postUpdateBook)
-router.post("/deletebook", staffControllers.postDeleteBook)
+router.post("/addbook", staffControllers.authen, upload.single('bookcover'), staffControllers.postAddBook)
+router.post("/updatebook/:bookId", staffControllers.authen, upload.single('bookcover'),staffControllers.postUpdateBook)
+router.post("/deletebook", staffControllers.authen, staffControllers.postDeleteBook)
 
 //record
 router.get("/listcustomer", staffControllers.getAllCustomer)
 router.get("/listcustomer/:customerId", staffControllers.getCustomerDetail)
 router.get("/listrecord/:customerId",staffControllers.getCustomerRecord)
-router.post("/addrecord",staffControllers.postAddRerord)
-router.post("/updaterecord/:recordId",staffControllers.postUpdateRecord)
-router.post("/returnBook",staffControllers.postReturnBook)
+router.post("/addrecord", staffControllers.authen, staffControllers.postAddRerord)
+router.post("/updaterecord/:recordId", staffControllers.authen,staffControllers.postUpdateRecord)
+router.post("/returnBook", staffControllers.authen,staffControllers.postReturnBook)
 router.post("/listrecord/checkrecord",staffControllers.postCheckAllRecord)
 
-router.post("/deleterecord",staffControllers.postDeleteRecord)
+router.post("/deleterecord", staffControllers.authen, staffControllers.postDeleteRecord)
 
 //genre
 router.get("/listgenre", staffControllers.getAllGenres)
-router.post("/addgenre", staffControllers.postAddGenre)
-router.post("/updategenre/:genreId",staffControllers.postUpdateGenre)
-router.post("/deletegenre", staffControllers.postDeleteGenre)
+router.post("/addgenre",  staffControllers.authen, staffControllers.postAddGenre)
+router.post("/updategenre/:genreId", staffControllers.authen,staffControllers.postUpdateGenre)
+router.post("/deletegenre", staffControllers.authen, staffControllers.postDeleteGenre)
 
 //author
 router.get("/listauthor", staffControllers.getAllAuthors)
-router.post("/addauthor", staffControllers.postAddAuthor)
-router.post("/updateauthor/:authorId",staffControllers.postUpdateAuthor)
-router.post("/deleteauthor", staffControllers.postDeleteAuthor)
+router.post("/addauthor", staffControllers.authen, staffControllers.postAddAuthor)
+router.post("/updateauthor/:authorId", staffControllers.authen, staffControllers.postUpdateAuthor)
+router.post("/deleteauthor",  staffControllers.authen, staffControllers.postDeleteAuthor)
 
 module.exports = router

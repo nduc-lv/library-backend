@@ -8,7 +8,8 @@ const Staff = require("../models/Staff");
 
 const asyncHandler = require("express-async-handler");
 const { validator, body, validationResult } = require("express-validator");
-
+const jwt = require("jsonwebtoken")
+require('dotenv').config()
 // -------STAFFS------- //
 
 //[post] login
@@ -16,8 +17,7 @@ exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
     const Username = req.body.username;
     const Password = req.body.password;
     const account = await Staff.findOne({username: Username}).exec();
-    
-    const acc = await Staff.find().exec();
+ 
     if(!account){
         return res.status(404).json({
             message: "Tai khoan khong ton tai"
@@ -28,11 +28,40 @@ exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
             message: "Mat khau khong dung"
         })
     }
+ 
+ 
+    const accessToken = jwt.sign({id: account._id}, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d"
+    })
+    const refreshToken = jwt.sign({id: account._id}, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '30d'
+    })
+  
+    await Staff.updateOne({_id: account._id}, {$set:
+                                                {accessToken: accessToken , 
+                                                refreshToken: refreshToken 
+                                            }
+                                        })
     return res.status(200).json({
-        
         message: "Dang nhap thanh cong"
     })
 })
+
+exports.authen = (req, res, next) => {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1];
+   
+    if (!token ) return res.sendStatus(401);
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({
+                message: "ERR ACCESS TOKEN"
+            })
+        }
+        res.locals.staffId = user.id;
+        next()
+    })
+}
 
 // -------BOOK------- //
 
