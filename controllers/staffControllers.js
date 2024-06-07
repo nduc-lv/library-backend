@@ -73,6 +73,8 @@ exports.postAddBook = asyncHandler(async (req, res, next) => {
         })
     
     }
+    console.log(req.body.genres)
+    console.log(req.body.authors)
     // add book
     const newBook = new Book({
         name : req.body.name,
@@ -80,7 +82,8 @@ exports.postAddBook = asyncHandler(async (req, res, next) => {
         genres: req.body.genres,
         authors: req.body.authors,
         review: req.body.review,
-        quantity: req.body.quantity
+        quantity: req.body.quantity,
+        total: req.body.quantity
     });
     await newBook.save();
 
@@ -102,12 +105,7 @@ exports.postUpdateBook = asyncHandler(async (req, res, next) => {
     }
 
     await Book.updateOne({ _id: bookId }, {
-        name : req.body.name,
         image: req.file.originalname,
-        genres: req.body.genres,
-        authors: req.body.authors,
-        review: req.body.review,
-        quantity: req.body.quantity
     });
 
     res.status(200).json({
@@ -115,7 +113,30 @@ exports.postUpdateBook = asyncHandler(async (req, res, next) => {
         message: "Update book success",
     })
 })
-
+exports.postUpdateBookSingle = asyncHandler(async (req, res, next) => {
+    const bookId = req.params.bookId;
+    const type = req.params.type;
+    switch (type) {
+        case "review":
+            await Book.updateOne({_id: bookId}, {review: req.body.review});
+            break;
+        case "title": 
+            await Book.updateOne({_id: bookId}, {name: req.body.name, genres: req.body.genres, authors: req.body.authors})
+            break;
+        case "quantity":
+            await Book.updateOne({_id: bookId}, {quantity: req.body.quantity});
+            break;
+        
+        default:
+            return res.status(404).json({
+                message: "Not found"
+            })
+            
+    }
+    return res.status(200).json({
+        message: "Success"
+    })
+})
 //[post] delete book
 exports.postDeleteBook = asyncHandler(async (req, res, next) => {
     const bookId = req.body.bookId;
@@ -163,6 +184,13 @@ exports.getCustomerDetail = asyncHandler(async (req, res, next) => {
     })
 })
 
+exports.getAllRecords = asyncHandler(async (req, res, next) => {
+    const records = await Record.find().populate("book").populate("customer").exec();
+    return res.status(200).json({
+        records
+    })
+})
+
 //[get] customerRecord
 exports.getCustomerRecord = asyncHandler(async (req, res, next) => {
     const customerId = req.params.customerId;
@@ -184,6 +212,12 @@ exports.getCustomerRecord = asyncHandler(async (req, res, next) => {
 exports.postAddRerord = asyncHandler( async (req, res, next) => {
 
     const book = await Book.findById(req.body.bookId).exec();
+    const customer = await Customer.findOne({email: req.body.email}).exec();
+    if (!customer){
+        return res.status(404).json({
+            message: "Customer not found"
+        })
+    }
     if(!book){
         return res.status(404).json({
             message: "Book not found",
@@ -203,16 +237,59 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
     const date = new Date();
     const newRecord = new Record({
         book: req.body.bookId,
-        customer: req.body.customerId,
-        status: "Đặt cọc",
+        customer: customer._id,
+        status: "Đang mượn",
         numberOfBooks: req.body.numberOfBooks,
         timeStart: date.toISOString(),
-        timeEnd: date.setDate(date.getDate() + 7)
+        timeEnd: req.body.timeEnd,
     })
     await newRecord.save();
     return res.status(200).json({
         message: "Add record success",
     })
+})
+
+exports.getNumberOfBooks = asyncHandler(async (req, res, next) => {
+    const bookId = req.params.bookId;
+    try {
+        const records = await Record.find({book: bookId, status: {$not: /Đã trả/}}).exec();
+        
+        if (!records || records.length == 0) {
+            return res.status(200).json({
+                borrowedBooks: 0,
+                reservedBooks: 0,
+                outdatedBooks: 0
+            })
+        }
+        console.log(records)
+        const borrowedBooks = records.reduce((accumulator, record) => {
+            if (record.status == "Đang mượn"){
+                return accumulator + record.numberOfBooks;
+            };
+            return accumulator;
+        }, 0);
+        const reservedBooks = records.reduce((accumulator, record) => {
+            if (record.status == "Đặt cọc"){
+                return accumulator + record.numberOfBooks;
+            };
+            return accumulator;
+        }, 0)
+        const outdatedBooks = records.reduce((accumulator, record) => {
+            if (record.status == "Quá hạn"){
+                return accumulator + record.numberOfBooks;
+            }
+            return accumulator;
+        }, 0)
+        return res.status(200).json({
+            borrowedBooks,
+            reservedBooks,
+            outdatedBooks
+        })
+    }
+    catch (e){
+        console.log(e);
+        throw e;
+    }
 })
 
 //[post] updateCustomerRecord
@@ -274,6 +351,40 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
     }
 })
 
+exports.postReturnBook = (asyncHandler(async (req, res, next) => {
+    const recordId = req.body.recordId;
+    const record = await Record.findById(recordId).exec();
+    if (!record) {
+        return res.status(404).json({
+            message: "Record not found"
+        })
+    }
+    const currentDate = new Date();
+    await Promise.all([
+        Book.updateOne({_id: record.book}, {$inc: {quantity: record.numberOfBooks}}),
+        Record.updateOne({_id: recordId}, {status: "Đã trả", timeEnd: currentDate.toISOString()})
+    ]).catch((e) => {
+        console.log(e);
+    })
+    return res.status(200).json({
+        message: "Success"
+    })
+}))
+
+exports.postBorrowBook = asyncHandler(async (req, res, next) => {
+    const recordId = req.body.recordId;
+    const record = await Record.findById(recordId).exec();
+    if (!record) {
+        return res.status(404).json({
+            message: "Record not found"
+        })
+    }
+    const timeEnd = req.body.timeEnd;
+    await Record.updateOne({_id: recordId}, {status: "Đang mượn",timeEnd: timeEnd, timeStart: new Date().toISOString()})
+    return res.status(200).json({
+        message: "Success"
+    })
+})
 
 //[post] deleteRecord
 exports.postDeleteRecord = asyncHandler(async (req, res, next) => {

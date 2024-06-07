@@ -32,6 +32,10 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/customer', customerRouter);
 
+app.get('/images/:imageName', (req, res, next) => {
+  const absPath = path.resolve(`uploads/${req.params.imageName}`);
+  res.sendFile(absPath);
+})
 
 app.use('/api/staff', staffRouter);
 

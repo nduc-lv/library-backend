@@ -23,7 +23,7 @@ router.get("/listbook/:bookId", staffControllers.getBookDetails)
 router.post("/addbook",upload.single('bookcover'), staffControllers.postAddBook)
 router.post("/updatebook/:bookId",upload.single('bookcover') , staffControllers.postUpdateBook)
 router.post("/deletebook", staffControllers.postDeleteBook)
-
+router.post("/updateBookSingle/:bookId/:type", staffControllers.postUpdateBookSingle);
 //record
 router.get("/listcustomer", staffControllers.getAllCustomer)
 router.get("/listcustomer/:customerId", staffControllers.getCustomerDetail)
@@ -31,7 +31,10 @@ router.get("/listrecord/:customerId",staffControllers.getCustomerRecord)
 router.post("/addrecord",staffControllers.postAddRerord)
 router.post("/updaterecord/:recordId",staffControllers.postUpdateRecord)
 router.post("/deleterecord",staffControllers.postDeleteRecord)
-
+router.get("/getAllRecords", staffControllers.getAllRecords)
+router.post("/returnBook", staffControllers.postReturnBook)
+router.post("/borrowBook", staffControllers.postBorrowBook)
+router.get("/numberOfBooks/:bookId", staffControllers.getNumberOfBooks);
 //genre
 router.get("/listgenre", staffControllers.getAllGenres)
 router.post("/addgenre", staffControllers.postAddGenre)

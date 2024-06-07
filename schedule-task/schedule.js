@@ -28,7 +28,7 @@ const getNotifcationRecords = async () => {
 const getViolatedRecords = async () => {
     try {
         const currentDate = new Date();
-        const reservations = await Record.find({status: "Đặt cọc"}).populate("customer").exec();
+        const reservations = await Record.find({status: "Đặt cọc"}).exec();
         const violatedRecords = reservations.filter((record) => {
             const timeEnd = record.timeEnd;
             const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
@@ -44,6 +44,24 @@ const getViolatedRecords = async () => {
     }
 }
 
+const getOutdatedRecords = async () => {
+    try {
+        const currentDate = new Date();
+        const reservations = await Record.find({status: "Đang mượn"}).exec();
+        const violatedRecords = reservations.filter((record) => {
+            const timeEnd = record.timeEnd;
+            const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
+            const dateDiff =  Math.round(differenceInTime / (1000 * 3600 * 24));
+            if (dateDiff < 0) {
+                return record
+            }
+        })
+        return violatedRecords  
+    }
+    catch (e) {
+        throw e
+    }
+}
 const getIncreaseList = async () => {
     try {
         const currentDate = new Date();
@@ -67,8 +85,8 @@ const task = async () => {
     try {
         const notficationRecords = await getNotifcationRecords();
         const violatedRecords = await getViolatedRecords();
+        const outdatedRecords = await getOutdatedRecords();
         const increaseList = await getIncreaseList();
-
         // send notfication
         notficationRecords.forEach(async (record) => {
             const customerEmail = record.customer.email;
@@ -86,6 +104,12 @@ const task = async () => {
             await Customer.findOneAndUpdate({_id: record.customer, reputation: {$gt: 10}}, {$inc: {reputation: -10}});
             await ViolationRecord.findOneAndUpdate({customer: record.customer}, {timeStamp: new Date().toISOString()}, { upsert: true, new: true, setDefaultsOnInsert: true })
         })
+
+        // banned account
+        outdatedRecords.forEach(async (record) => {
+            await Customer.findOneAndUpdate({_id: record.customer}, {reputation: 0})
+        })
+
         // update customer score
         increaseList.forEach(async (record) => {
             await Customer.findOneAndUpdate({_id: record.customer, reputation: {$lt: 90}}, {$inc: {reputation: 10}});
