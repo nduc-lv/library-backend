@@ -37,14 +37,14 @@ router.post("/borrowBook", staffControllers.postBorrowBook)
 router.get("/numberOfBooks/:bookId", staffControllers.getNumberOfBooks);
 //genre
 router.get("/listgenre", staffControllers.getAllGenres)
-router.post("/addgenre", staffControllers.postAddGenre)
-router.post("/updategenre/:genreId",staffControllers.postUpdateGenre)
-router.post("/deletegenre", staffControllers.postDeleteGenre)
+router.post("/addgenre",  staffControllers.authen, staffControllers.postAddGenre)
+router.post("/updategenre/:genreId", staffControllers.authen,staffControllers.postUpdateGenre)
+router.post("/deletegenre", staffControllers.authen, staffControllers.postDeleteGenre)
 
 //author
 router.get("/listauthor", staffControllers.getAllAuthors)
-router.post("/addauthor", staffControllers.postAddAuthor)
-router.post("/updateauthor/:authorId",staffControllers.postUpdateAuthor)
-router.post("/deleteauthor", staffControllers.postDeleteAuthor)
+router.post("/addauthor", staffControllers.authen, staffControllers.postAddAuthor)
+router.post("/updateauthor/:authorId", staffControllers.authen, staffControllers.postUpdateAuthor)
+router.post("/deleteauthor",  staffControllers.authen, staffControllers.postDeleteAuthor)
 
 module.exports = router

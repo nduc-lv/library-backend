@@ -8,7 +8,8 @@ const Staff = require("../models/Staff");
 
 const asyncHandler = require("express-async-handler");
 const { validator, body, validationResult } = require("express-validator");
-
+const jwt = require("jsonwebtoken")
+require('dotenv').config()
 // -------STAFFS------- //
 
 //[post] login
@@ -16,8 +17,7 @@ exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
     const Username = req.body.username;
     const Password = req.body.password;
     const account = await Staff.findOne({username: Username}).exec();
-    
-    const acc = await Staff.find().exec();
+ 
     if(!account){
         return res.status(404).json({
             message: "Tai khoan khong ton tai"
@@ -28,11 +28,40 @@ exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
             message: "Mat khau khong dung"
         })
     }
+ 
+ 
+    const accessToken = jwt.sign({id: account._id}, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d"
+    })
+    const refreshToken = jwt.sign({id: account._id}, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '30d'
+    })
+  
+    await Staff.updateOne({_id: account._id}, {$set:
+                                                {accessToken: accessToken , 
+                                                refreshToken: refreshToken 
+                                            }
+                                        })
     return res.status(200).json({
-        
         message: "Dang nhap thanh cong"
     })
 })
+
+exports.authen = (req, res, next) => {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1];
+   
+    if (!token ) return res.sendStatus(401);
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({
+                message: "ERR ACCESS TOKEN"
+            })
+        }
+        res.locals.staffId = user.id;
+        next()
+    })
+}
 
 // -------BOOK------- //
 
@@ -210,7 +239,6 @@ exports.getCustomerRecord = asyncHandler(async (req, res, next) => {
 
 //[post] addCustomerRecord
 exports.postAddRerord = asyncHandler( async (req, res, next) => {
-
     const book = await Book.findById(req.body.bookId).exec();
     const customer = await Customer.findOne({email: req.body.email}).exec();
     if (!customer){
@@ -223,7 +251,7 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
             message: "Book not found",
         }) 
     }
-
+    //kiem tra so luong sach con lai
     const quantity= book.quantity;
  
     if(quantity < req.body.numberOfBooks * 1){
@@ -231,8 +259,13 @@ exports.postAddRerord = asyncHandler( async (req, res, next) => {
             message: "Out of book"
         })
     }
-   
+    if(customer.reputation <= 10){
+        return res.status(400).json({
+            message: "Customer not enough reputation"
+        })
+    }
     await Book.updateOne({_id: req.body.bookId} , {quantity: quantity - req.body.numberOfBooks * 1});
+    await Customer.updateOne({_id: req.body.customerId} , {reputation: customer.reputation*1 - 10});
 
     const date = new Date();
     const newRecord = new Record({
@@ -293,9 +326,8 @@ exports.getNumberOfBooks = asyncHandler(async (req, res, next) => {
 })
 
 //[post] updateCustomerRecord
-exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
+exports.postUpdateRecord = asyncHandler(async (req, res, next) => { //thay doi noi dung cua ban ghi muon sach cua khach hang
     const recordId = req.params.recordId;
-
     const bookId = req.body.bookId;
     const customerId = req.body.customerId;
     const NumberOfBooks = req.body.numberOfBooks;
@@ -306,6 +338,11 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
         Book.findById(bookId).select('quantity').exec(),
         Record.findById(recordId).exec()
     ])
+    if(record.status == "Đã trả"){
+        return res.status(400).json({
+            message: "Record returned, Can not Fix"
+        })
+    }
     if (!customer) {
         return res.status(404).json({
             message: "Customer not found"
@@ -320,11 +357,7 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
     const oldbook = await Book.findById(record.book).select('quantity').exec() ;
    
     await Book.updateOne({ _id: oldbook._id }, { quantity: oldbook.quantity + record.numberOfBooks })
-    //return res.status(200).json({
-        
-    //})
     let count = book.quantity;
-
     if ((count - NumberOfBooks ) > 0) {
 
         await Promise.all(
@@ -349,6 +382,8 @@ exports.postUpdateRecord = asyncHandler(async (req, res, next) => {
             message: "Out of books"
         })
     }
+
+
 })
 
 exports.postReturnBook = (asyncHandler(async (req, res, next) => {
@@ -575,9 +610,17 @@ const delBook = async (bookId) =>{
 
 //delAuthor
 const delAuthor = async (authorId) =>{
-    const books = Book.find({authors:{$in: authorId}}).exec();
-    (await books).map(book =>{
-        delBook(book._id)
+    const books = await Book.find({authors:{$in: authorId}}).exec();
+
+    books.map(async (book) =>{
+        const oldAuthors = book.authors
+        const newAuthors = oldAuthors.filter(author => author != authorId);
+        if (newAuthors.length == 0){
+            delBook(book._id);
+        }
+        await Book.updateOne({_id: book._id}, {
+            authors: newAuthors
+        });
     });
     await Author.deleteOne({ _id:authorId })
 }
