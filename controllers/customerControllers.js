@@ -100,7 +100,7 @@ const addRecord = async (customerId, bookId, action, numberOfBooks) => {
         const newRecord = new Record({
             book: bookId,
             customer: customerId,
-            status: "Đặt cọc",
+            status: "Đặt trước",
             numberOfBooks: numberOfBooks,
             timeStart: date.toISOString(),
             timeEnd: date.setDate(date.getDate() + 7)
@@ -131,7 +131,7 @@ exports.getAllReseveration = asyncHandler(async (req, res, next) => {
             {
                 const [reservation, count] = await Promise.all(
                     [
-                        Record.find({customer: customerId, status: "Đặt cọc"})
+                        Record.find({customer: customerId, status: "Đặt trước"})
                         .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
                         Record.countDocuments({customer: customerId})
                     ]
@@ -254,7 +254,7 @@ exports.postUpdateReservation = asyncHandler(async(req, res, next) => {
         })
     }
     const [record] = await Promise.all([
-        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt cọc*.", $options: 'i'}}).populate("book").exec() 
+        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt trước*.", $options: 'i'}}).populate("book").exec() 
     ]) 
     // let count;
     // if (book){
@@ -318,7 +318,7 @@ exports.postDeleteReservation = asyncHandler(async (req, res, next) => {
     // get the current quantity of the book
     const [book, record] = await Promise.all([
         Book.findById(bookId).select('quantity').exec(),
-        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt cọc*.", $options: 'i'}}).populate("book").exec() 
+        Record.findOne({_id: recordId, customer: customerId, status: {$regex: ".*Đặt trước*.", $options: 'i'}}).populate("book").exec() 
     ]) 
     let count;
     if (book){

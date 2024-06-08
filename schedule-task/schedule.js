@@ -9,7 +9,7 @@ const schedule = require('node-schedule');
 const getNotifcationRecords = async () => {
     try {
         const currentDate = new Date();
-        const reservations = await Record.find({status: "Đặt cọc"}).populate('customer').populate("book").exec();
+        const reservations = await Record.find({status: "Đặt trước"}).populate('customer').populate("book").exec();
         const notficationRecords = reservations.filter((record) => {
             const timeEnd = record.timeEnd;
             const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
@@ -28,7 +28,7 @@ const getNotifcationRecords = async () => {
 const getViolatedRecords = async () => {
     try {
         const currentDate = new Date();
-        const reservations = await Record.find({status: "Đặt cọc"}).exec();
+        const reservations = await Record.find({status: "Đặt trước"}).exec();
         const violatedRecords = reservations.filter((record) => {
             const timeEnd = record.timeEnd;
             const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
@@ -107,12 +107,12 @@ const task = async () => {
 
         // banned account
         outdatedRecords.forEach(async (record) => {
-            await Customer.findOneAndUpdate({_id: record.customer}, {reputation: 0})
+            await Customer.findOneAndUpdate({_id: record.customer}, {reputation: 1})
         })
 
         // update customer score
         increaseList.forEach(async (record) => {
-            await Customer.findOneAndUpdate({_id: record.customer, reputation: {$lt: 90}}, {$inc: {reputation: 10}});
+            await Customer.findOneAndUpdate({$and:[{_id: record.customer}, {reputation: {$gt: 10}}, {reputation: {$lt: 90}}]} ,{$inc: {reputation: 10}});
             await ViolationRecord.findOneAndUpdate({_id: record._id}, {timeStamp: new Date().toISOString()}, { upsert: true, new: true, setDefaultsOnInsert: true })
         })
     }
@@ -122,5 +122,5 @@ const task = async () => {
 }
 
 exports.schedulTask = () => {
-    schedule.scheduleJob({hour: 16, minute: 30}, task)
+    schedule.scheduleJob({hour: 14, minute: 44}, task)
 }

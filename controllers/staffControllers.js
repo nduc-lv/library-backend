@@ -43,6 +43,8 @@ exports.postStaffLogin = asyncHandler(async (req, res, next) =>{
                                             }
                                         })
     return res.status(200).json({
+        accessToken,
+        refreshToken,
         message: "Dang nhap thanh cong"
     })
 })
@@ -63,6 +65,33 @@ exports.authen = (req, res, next) => {
     })
 }
 
+exports.refreshToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    console.log(process.env.ACCESS_TOKEN_SECRET)
+    if (token == null){
+        return res.status(403).json({
+            message: "ERR REFRESH TOKEN"
+        })
+    }
+    else{
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+            console.log(err);
+            console.log(user);
+            if (err) {
+                return res.status(403).json({
+                    message: "ERR REFERSH TOKEN"
+                })
+            }
+            const newToken = jwt.sign({id: user.id}, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: "1d"
+            })
+            return res.status(200).json({
+                accessToken: newToken
+            })
+        })
+    }
+}
 // -------BOOK------- //
 
 //[get] Allbook
@@ -145,6 +174,14 @@ exports.postUpdateBook = asyncHandler(async (req, res, next) => {
 exports.postUpdateBookSingle = asyncHandler(async (req, res, next) => {
     const bookId = req.params.bookId;
     const type = req.params.type;
+    console.log(req.body.name);
+    const books = await Book.find({name: req.body.name}).exec();
+    console.log(books);
+    if (books && books.length > 0 && books[0]._id != bookId){
+        return res.status(400).json({
+            message: "Book Existed"
+        })
+    }
     switch (type) {
         case "review":
             await Book.updateOne({_id: bookId}, {review: req.body.review});
@@ -177,7 +214,7 @@ exports.postDeleteBook = asyncHandler(async (req, res, next) => {
             message: "book not found"
         })
     }
-    delBook(bookId);
+    await delBook(bookId);
     return res.status(200).json({
         message: "Delete Book Success"
     })
@@ -199,6 +236,7 @@ exports.getAllCustomer = asyncHandler(async (req, res, next) => {
     })
 })
 
+
 //[get] customerDetail
 exports.getCustomerDetail = asyncHandler(async (req, res, next) => {
     const customerId = req.params.customerId;
@@ -218,6 +256,22 @@ exports.getAllRecords = asyncHandler(async (req, res, next) => {
     return res.status(200).json({
         records
     })
+})
+
+exports.unlockCustomer = asyncHandler(async (req, res,netx) => {
+    const customerId = req.body.customerId;
+
+    const customer = await Customer.findById(customerId).exec();
+    if (!customer){
+        return res.status(404).json({
+            message: "Khong tim thay khach hang"
+        })
+    }
+    await Customer.findByIdAndUpdate(customerId, {reputation: 11});
+    return res.status(200).json({
+        message: "success"
+    })
+
 })
 
 //[get] customerRecord
@@ -302,7 +356,7 @@ exports.getNumberOfBooks = asyncHandler(async (req, res, next) => {
             return accumulator;
         }, 0);
         const reservedBooks = records.reduce((accumulator, record) => {
-            if (record.status == "Đặt cọc"){
+            if (record.status == "Đặt trước"){
                 return accumulator + record.numberOfBooks;
             };
             return accumulator;
@@ -433,8 +487,7 @@ exports.postDeleteRecord = asyncHandler(async (req, res, next) => {
     }
  
     // trả lại sách
-    const book = await Book.findById(record.book).select('quantity').exec() ;
-    await Book.updateOne({ _id: book._id }, { quantity: book.quantity + record.numberOfBooks })
+    const book = await Book.findById(record.book).select('quantity').exec();
     // xóa bản ghi
     await Record.deleteOne({ _id: recordId })
     return res.status(200).json({
@@ -514,7 +567,7 @@ exports.postDeleteGenre = asyncHandler(async (req, res, next) => {
              message: "Genre not found"
     }) 
     }
-    delGenre(genre._id);
+    await delGenre(genre._id);
    
     return res.status(200).json({
 
@@ -592,7 +645,7 @@ exports.postDeleteAuthor = asyncHandler(async (req, res, next) => {
              message: "Author not found"
     }) 
     }
-    delAuthor(author._id)
+    await delAuthor(author._id)
     return res.status(200).json({
         message: "Delete Author success"
     })
@@ -627,7 +680,6 @@ const delAuthor = async (authorId) =>{
 
 //delGenre
 const delGenre = async (genreId) => {
-
     const books =await Book.find({genres: {$in: genreId}}).select('genres').exec()
     books.map(async book =>{
         const oldGenre = book.genres
