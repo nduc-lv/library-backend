@@ -14,7 +14,7 @@ const getNotifcationRecords = async () => {
             const timeEnd = record.timeEnd;
             const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
             const dateDiff =  Math.round(differenceInTime / (1000 * 3600 * 24));
-            if (0 <= dateDiff <= 2) {
+            if (0 <= dateDiff && dateDiff <= 2) {
                 return record
             }
         })
@@ -62,6 +62,24 @@ const getOutdatedRecords = async () => {
         throw e
     }
 }
+const getAlmostOutdateRecords = async () => {
+    try {
+        const currentDate = new Date();
+        const reservations = await Record.find({status: "Đang mượn"}).populate('customer').populate("book").exec();
+        const violatedRecords = reservations.filter((record) => {
+            const timeEnd = record.timeEnd;
+            const differenceInTime = new Date(timeEnd).getTime() - currentDate.getTime();
+            const dateDiff =  Math.round(differenceInTime / (1000 * 3600 * 24));
+            if (dateDiff > 0 && dateDiff < 4) {
+                return record
+            }
+        })
+        return violatedRecords  
+    }
+    catch (e) {
+        throw e
+    }
+}
 const getIncreaseList = async () => {
     try {
         const currentDate = new Date();
@@ -87,6 +105,7 @@ const task = async () => {
         const violatedRecords = await getViolatedRecords();
         const outdatedRecords = await getOutdatedRecords();
         const increaseList = await getIncreaseList();
+        const almostOutDateRecords = await getAlmostOutdateRecords();
         // send notfication
         notficationRecords.forEach(async (record) => {
             const customerEmail = record.customer.email;
@@ -95,6 +114,15 @@ const task = async () => {
                 to: `${customerEmail}`,
                 subject: "ĐƠN SÁCH SẮP HẾT HẠN",
                 text: `Xin chao, ${record.customer.name}. Bạn có 1 đơn đặt trước sách "${record.book.name}" sắp hết hạn, vui lòng đến lấy tại thư viện`
+            })
+        })
+        almostOutDateRecords.forEach(async (record) => {
+            const customerEmail = record.customer.email;
+            await sendingMail({
+                from: "no-reply@gmail.com",
+                to: `${customerEmail}`,
+                subject: "ĐƠN SÁCH SẮP HẾT HẠN",
+                text: `Xin chao, ${record.customer.name}. Bạn có 1 đơn mượn sách "${record.book.name}" sắp hết hạn, vui lòng đến trả tại thư viện`
             })
         })
         // delete and penalty violated record
@@ -122,5 +150,5 @@ const task = async () => {
 }
 
 exports.schedulTask = () => {
-    schedule.scheduleJob({hour: 14, minute: 44}, task)
+    schedule.scheduleJob({hour: 8, minute: 36}, task)
 }
