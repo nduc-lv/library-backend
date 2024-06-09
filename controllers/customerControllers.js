@@ -512,7 +512,7 @@ exports.postSignUp  = [
                 from: "no-reply@gmail.com",
                 to: `${req.body.email}`,
                 subject: "Account Verification Link",
-                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau: http://localhost:3000/api/customer/verify-email/${newCustomer._id}` 
+                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau: https://library-back-425902.df.r.appspot.com/api/customer/verify-email/${newCustomer._id}` 
             })
         }
         return res.status(200).json({
@@ -538,7 +538,7 @@ exports.verfiyEmail =  asyncHandler(async (req, res, next) => {
     }
     else {
         await Customer.updateOne({_id: userId}, {isVerified: true});
-        return res.redirect("http://localhost:8080/login")
+        return res.redirect("https://hustlibrary-7xvgjhg45q-df.a.run.app/login")
     }
 })
 
@@ -566,7 +566,7 @@ exports.postLogin = [
                 message: "Tai khoan khong ton tai"
             })
         }
-        const isSame = bcrypt.compare(password, customer.password);
+        const isSame = bcrypt.compareSync(password, customer.password);
         console.log(isSame)
         if (isSame){
             let accessToken = jwt.sign({id: customer._id}, process.env.key, {
@@ -766,7 +766,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
             from: "no-reply@gmail.com",
             to: `${req.body.email}`,
             subject: "Reset Password",
-            text: `Xin chao. Truy cập đường link sau để cài lại mật khẩu của bạn  http://localhost:8080/forgotPassword/${token}` 
+            text: `Xin chao. Truy cập đường link sau để cài lại mật khẩu của bạn  https://hustlibrary-7xvgjhg45q-df.a.run.app/forgotPassword/${token}` 
         })
         res.status(200).json({
             message: "Success"
