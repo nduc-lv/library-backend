@@ -140,8 +140,7 @@ exports.postAddBook = asyncHandler(async (req, res, next) => {
         genres: req.body.genres,
         authors: req.body.authors,
         review: req.body.review,
-        quantity: req.body.quantity,
-        total: req.body.quantity
+        quantity: req.body.quantity
     });
     await newBook.save();
 
