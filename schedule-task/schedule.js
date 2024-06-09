@@ -128,14 +128,16 @@ const task = async () => {
         // delete and penalty violated record
         violatedRecords.forEach(async (record) => {
             await Book.findOneAndUpdate({_id: record.book}, {$inc: {quantity: record.numberOfBooks}});
-            await Record.findByIdAndDelete(record._id);
+            await Record.findByIdAndDelete({_id: record._id});
             await Customer.findOneAndUpdate({_id: record.customer, reputation: {$gt: 10}}, {$inc: {reputation: -10}});
             await ViolationRecord.findOneAndUpdate({customer: record.customer}, {timeStamp: new Date().toISOString()}, { upsert: true, new: true, setDefaultsOnInsert: true })
         })
-
+        
         // banned account
         outdatedRecords.forEach(async (record) => {
+            await Record.findOneAndUpdate({_id: record._id}, {status: "Quá hạn"});
             await Customer.findOneAndUpdate({_id: record.customer}, {reputation: 1})
+            await ViolationRecord.findOneAndUpdate({customer: record.customer}, {timeStamp: new Date().toISOString()}, { upsert: true, new: true, setDefaultsOnInsert: true })
         })
 
         // update customer score
@@ -150,5 +152,5 @@ const task = async () => {
 }
 
 exports.schedulTask = () => {
-    schedule.scheduleJob({hour: 8, minute: 36}, task)
+    schedule.scheduleJob({hour: 6, minute: 0}, task)
 }
