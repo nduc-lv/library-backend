@@ -162,7 +162,7 @@ exports.getAllReseveration = asyncHandler(async (req, res, next) => {
             {
                 const [reservation, count] = await Promise.all(
                     [
-                        Record.find({customer: customerId, status: "Đang mượn"})
+                        Record.find({customer: customerId, status:{$in: ["Đang mượn", "Quá hạn"]}})
                         .skip((page - 1) * limit).populate({path: "book", populate: {path: "authors"}}).populate({path: "book", populate: {path: "genres"}}).exec(),
                         Record.countDocuments({customer: customerId})
                     ]
@@ -199,7 +199,7 @@ exports.postReserveBooks = asyncHandler(async (req, res, next) => {
             message: "Khong duoc phep"
         })
     }
-    const book = await Book.findOneAndUpdate({_id: bookId, quantity: { $gt: numberOfBooks * 1}}, { $inc: { quantity: - numberOfBooks * 1} })
+    const book = await Book.findOneAndUpdate({_id: bookId, quantity: { $gt: numberOfBooks * 1 - 1}}, { $inc: { quantity: - numberOfBooks * 1} })
     if (!book) {
         const requestedBook = await Book.findById(bookId);
         if (!requestedBook) {
@@ -512,7 +512,7 @@ exports.postSignUp  = [
                 from: "no-reply@gmail.com",
                 to: `${req.body.email}`,
                 subject: "Account Verification Link",
-                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau: http://localhost:3001/api/customer/verify-email/${newCustomer._id}` 
+                text: `Xin chao, ${req.body.name}. Xac thuc tai khoan cua ban bang cach nhan vao duong link sau: http://localhost:3000/api/customer/verify-email/${newCustomer._id}` 
             })
         }
         return res.status(200).json({
